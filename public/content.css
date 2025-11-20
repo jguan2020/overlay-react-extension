@@ -1,0 +1,12 @@
+html::before { 
+    content: ""; 
+    position: fixed; 
+    inset: 0; 
+    background: rgba(var(--overlay-color, 38 166 154) / var(--overlay-opacity, 0.1));
+    z-index: 2147483647; 
+    pointer-events: none; 
+}
+
+html[data-enabled = "false"]::before {
+    display:none
+}
