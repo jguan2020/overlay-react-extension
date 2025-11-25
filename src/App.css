@@ -3,12 +3,67 @@ body {
   width: 200px;
   padding: 10px;
   text-align: center;
-  background: linear-gradient(135deg, var(--gradient-color1,#a37be4), var(--gradient-color2,#e58fc9));
 }
 
-.popup-root{
-  width:200px;
-  height:200px;
+.window {
+    position:relative;
+}
+
+.settingsPage {
+    width :200px;
+    margin: 0 auto;
+}
+.settings{
+    position: absolute;
+    top:0px;
+    right:0px;
+    cursor:pointer
+}
+
+.settingsWrap {
+    display:flex;
+    flex-direction: column;
+    gap:10px;
+}
+
+.settingsTitle {
+    font-size: 18px;
+    text-align: center;
+}
+
+.loginIdSave {
+    display:flex;
+    flex-direction: row;
+    align-items:center;
+    gap:8px;
+}
+
+.loginIdTextBox {
+    display:block;
+    margin: 0 auto;
+    width:150px;
+    height:20px;
+}
+
+.saveBack {
+    display:flex;
+    flex-direction: row;
+    gap:20px;
+    justify-content: center;
+}
+
+.settingsBtn {
+    transition: transform 50ms ease;
+    will-change: transform;
+    font-weight: 400;
+}
+.settingsBtn:active {
+    transform: translateY(1px);
+}
+
+.settingsBtn:hover {
+    box-shadow: 0 4px 10px rgba(0,0,0,.18);
+    filter: brightness(1.05) saturate(1.05);
 }
 
 h1 {
@@ -118,7 +173,7 @@ input[type="range"] {
 
 .colorAlphaBox{
     display:flex;
-    gap:10px;
+    gap:15px;
     flex-direction: column;
     margin-top: 8px;
 }

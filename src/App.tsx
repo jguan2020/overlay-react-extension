@@ -1,202 +1,189 @@
-import {useState, useEffect, useRef} from 'react';
-import './App.css';
+import { useState,useEffect } from 'react';
 
-function hexToRGBA(hex:string, a=1){
-    const r = parseInt(hex.substring(1,3),16);
-    const g = parseInt(hex.substring(3,5),16);
-    const b = parseInt(hex.substring(5,7),16);
-    const rgb = 'rgba('+r.toString()+', '+g.toString()+', '+b.toString()+', '+a.toString()+')';
-    return rgb;
-}
+//Helper functions to convert hex color codes to HSL and CSS formats
+//and derive different colors
+import {hexToHSL,findHSL2,HSLToCss} from './utils/colors';
 
-void hexToRGBA;
+import './App.css'
 
-function hexToHSL(hex:string){
-    const r = parseInt(hex.substring(1,3),16);
-    const g = parseInt(hex.substring(3,5),16);
-    const b = parseInt(hex.substring(5,7),16);
-    const R = r/255, G=g/255, B=b/255;
-    const max = Math.max(R,G,B);
-    const min = Math.min(R,G,B);
-    const delta = max-min;
-    const L = (max+min)/2;
-    const S = (delta==0) ? 0: (delta)/(1-Math.abs(2*L-1));
-    var H = 0;
-    if(delta!=0){
-        if(max==R){
-            H = 60*(((G-B)/delta) % 6);
-        }
-        else if(max==G){
-            H = 60*((B-R)/delta+2);
-        }
-        else{
-            H = 60*((R-G)/delta+4);
-        }
-        if(H<0){
-            H+=360;
-        }
-    }
-    H = H % 360;
-    return {H:H,S:S,L:L};
-}
-
-function clamp(x:number){
-    return Math.max(0,Math.min(1,x));
-}
-
-function findHSL2(H:number,S:number,L:number){
-    const H2 = (H+30) %360;
-    var S2 = clamp(S*0.9);
-    if(S2<0.08){
-        S2 = 0.12;
-    }
-    const L2 = clamp(L+(L<0.55 ? +0.15:-0.15));
-    return {H2:H2, S2:S2, L2:L2};
-}
-
-function HSLToCss({H2, S2, L2}:{H2:number;S2:number;L2:number},a:number=1){
-    return "hsl("+(Math.round(H2)).toString()+ " "+(Math.round(S2*100)).toString()+"% "+(Math.round(L2*100)).toString()+"% / " + a.toString()+")";
-}
-
+//AWS Lambda Api to interact with DynamoDB tables
+const AWS_URL = "https://zxxgrnmd48.execute-api.us-east-1.amazonaws.com/Prod";
 
 
 function App() {
+  //States- toggle, overlay color, opacity, show settings flag
+  const [isEnabled, setIsEnabled] = useState(true);
+  const [overlayColor, setOverlayColor] = useState("#26A69A");
+  const [opacity, setOpacity] = useState(0.1);
+  const [showSettings, setShowSettings] = useState(false);
+  const [loginId, setLoginId] = useState("");
 
+  //init
+  useEffect(() => {
 
-const [color, setColor] = useState("#ffcc88");
-const [opacity, setOpacity] = useState(0.1);
-const [isEnabled, setIsEnabled] = useState(true);
-const colorInit = useRef(false);
-const opacityInit = useRef(false);
-const isEnabledInit = useRef(false);
+    //isEnabled handler
+    chrome.storage.local.get({ isEnabled: true }, ({isEnabled}: { isEnabled:boolean }) => {
+      setIsEnabled(isEnabled);
+    });
 
-function preset(text:string){
-  setColor(text);
-  setOpacity(0.1);
-}
-
-function toggle(isEnabled:boolean){
-  chrome.storage.local.set({isEnabled:isEnabled});
-  setIsEnabled(isEnabled);
-}
-
-
-useEffect(()=>{
-  chrome.storage.local.get('color',(data: {color:string})=>{
-    if(data.color){
-      setColor(data.color);
-      document.documentElement.style.setProperty('--thumb-color',data.color);
-      const HSL1 = hexToHSL(data.color);
-      const HSL2 = findHSL2(HSL1.H,HSL1.S,HSL1.L);
-      const color2 = HSLToCss(HSL2,0.1);
-      document.documentElement.style.setProperty('--gradient-color1',data.color);
-      document.documentElement.style.setProperty('--gradient-color2',color2);
-    }
-    colorInit.current = true;
-  });
-  chrome.storage.local.get('opacity',(data:{opacity:number})=>{
-    if(data.opacity){
-      const opacityRounded = Math.round(data.opacity*100)/100;
-      setOpacity(opacityRounded);
-    }
-    else{
-      chrome.storage.local.set({
-        opacity:0.1
-      });
-    }
-    opacityInit.current = true;
-  });
-
-  chrome.storage.local.get('isEnabled',(data:{isEnabled:boolean})=>{
-    if(typeof data.isEnabled === 'boolean'){
-      setIsEnabled(data.isEnabled);
-    }
-    isEnabledInit.current = true;
-  });
-
-
-},[]);
-
-
-useEffect(()=>{
-  const onChange = (
-    data:Record<string,chrome.storage.StorageChange>, 
-    storageType: string) =>{
-      if(storageType!== 'local'){
-        return;
-      }
-      if(typeof data.color?.newValue === 'string'){
-        setColor(data.color.newValue);
-      }
-      if(typeof data.opacity?.newValue === 'number'){
-        setOpacity(data.opacity.newValue);
-      }
-      if(typeof data.isEnabled?.newValue==='boolean'){
-        setIsEnabled(data.isEnabled.newValue);
+    const isEnabledHandler = (
+      changes: Record<string,chrome.storage.StorageChange>,
+      storageType: string
+    ) => {
+      if(storageType==='local' && changes.isEnabled){
+        setIsEnabled(changes.isEnabled.newValue as boolean);
       }
     };
-    chrome.storage.onChanged.addListener(onChange);
-    return ()=> chrome.storage.onChanged.removeListener(onChange);
 
-},[]);
+    //overlayColor handler
+    chrome.storage.local.get({ overlayColor: "#26A69A" }, ({overlayColor}: { overlayColor:string }) => {
+      setOverlayColor(overlayColor);
+    });
 
-useEffect(()=>{
-  if(colorInit.current){
-    chrome.storage.local.set({color});
-    document.documentElement.style.setProperty('--thumb-color',color);
-    const HSL1 = hexToHSL(color);
+    const overlayColorHandler = (
+      changes: Record<string,chrome.storage.StorageChange>,
+      storageType: string
+    ) => {
+      if(storageType==='local' && changes.overlayColor){
+        setOverlayColor(changes.overlayColor.newValue as string);
+      }
+    };
+
+
+    //opacity handler
+    chrome.storage.local.get({ opacity: 0.1 }, ({opacity}: { opacity:number }) => {
+      setOpacity(opacity);
+    });
+
+    const opacityHandler = (
+      changes: Record<string,chrome.storage.StorageChange>,
+      storageType: string
+    ) => {
+      if(storageType==='local' && changes.opacity){
+        setOpacity(changes.opacity.newValue as number);
+      }
+    };
+
+
+    //add all handlers
+    chrome.storage.onChanged.addListener(isEnabledHandler);
+    chrome.storage.onChanged.addListener(opacityHandler);
+    chrome.storage.onChanged.addListener(overlayColorHandler);
+    return () => {
+      chrome.storage.onChanged.removeListener(isEnabledHandler);
+      chrome.storage.onChanged.removeListener(overlayColorHandler);
+      chrome.storage.onChanged.removeListener(opacityHandler);
+    }
+  }, []);
+
+  //save color, opacity, login, to aws DynamoDB table
+  async function saveProfile(loginId: string){
+    const body = JSON.stringify({ userId: loginId, color: overlayColor, opacity });
+    const res = await fetch(`${AWS_URL}/profiles`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body
+    });
+    if(!res.ok){
+      throw new Error('Failure to save profile');
+    }
+  }
+
+  //grab color, opacity, from aws DynamoDB table by login
+  async function loadProfile(loginId: string){
+    const res = await fetch(`${AWS_URL}/profiles?userId=${encodeURIComponent(loginId)}`);
+    if(!res.ok){
+      throw new Error('Failure to load profile');
+    }
+    const profile = await res.json();
+    setOverlayColor(profile.color);
+    setOpacity(profile.opacity);
+    chrome.storage.local.set({overlayColor: profile.color, opacity: profile.opacity});
+  }
+
+
+  //Preset options
+  const applyPreset = (color:string) => {
+    setOverlayColor(color);
+    setOpacity(0.1);
+    chrome.storage.local.set({
+      overlayColor:color, opacity:0.1
+    });
+  };
+
+  //Set background color
+  useEffect(()=>{
+    document.documentElement.style.setProperty('--thumb-color',overlayColor);
+    const HSL1 = hexToHSL(overlayColor);
     const HSL2 = findHSL2(HSL1.H,HSL1.S,HSL1.L);
     const color2 = HSLToCss(HSL2,0.1);
-    document.documentElement.style.setProperty('--gradient-color1',color);
+    document.documentElement.style.setProperty('--gradient-color1',overlayColor);
     document.documentElement.style.setProperty('--gradient-color2',color2);
-  }
-}, [color]);
 
+  },[overlayColor]);
 
-useEffect(()=>{
-  if(opacityInit.current){
-    chrome.storage.local.set({opacity});
-  }
-}, [opacity]);
-
-useEffect(()=>{
-  if(isEnabledInit.current){
-    chrome.storage.local.set({isEnabled});
-  }
-}, [isEnabled]);
+  //Set opacity number
+  useEffect(()=>{
+    const opacityRounded = Math.round(opacity*100)/100;
+    document.documentElement.style.setProperty('--overlay-opacity',String(opacityRounded));
+  },[opacity]);
 
 
 
-
+  //Shows settings page or main page based on showSettings
   return (
 
-<div className="popup-root">
-
-
-  <div className="pageWrap">
+  <div className="window">
+  
+  {showSettings ? (
+    <div className="settingsPage">
+      <div className="settingsWrap">
+      <div className="settingsTitle">Sync Across Devices By Email Or Username</div>
+      <div className="loginIdSave">  
+        <input type="text" className="loginIdTextBox" placeholder="Email/Username" value={loginId} 
+        onChange={(event) => setLoginId(event.target.value)}></input>
+      </div>
+      <div className="saveBack">
+      <button className="settingsBtn" onClick={()=>setShowSettings(false)}>Back</button>
+      <button className="settingsBtn" onClick={()=>loadProfile(loginId)}>Load</button>
+      <button className="settingsBtn" onClick={()=>saveProfile(loginId)}>Save</button>
+      </div>
+      </div>
+      </div>
+  ):(
+  <>
+  <img className="settings" src="images/settings.png" alt="Settings" onClick={()=>setShowSettings(true)}></img>
   <div className="colorAlphaBox">
 
   <div className="colorPicker">
   <img src="images/color-wheel-icon.svg.png" id="colorWheel"></img>
-  <input type="color" value={color} id="color" onChange={(event)=>{setColor(event.target.value)}}></input>
-  <div id="colorString">{color}</div>
+  <input type="color" value={overlayColor} id="color" onChange={(e)=>{
+    const next = e.target.value;
+    setOverlayColor(next);
+    chrome.storage.local.set({overlayColor:next});
+  }}></input>
+  <div id="colorString">{overlayColor}</div>
   </div>
 
   
   <div className="alphaBox">
 
   <div className="alphaSlider">
-  <input type="range" id="alphaValue" min="0" max="1" step="0.01" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))}></input>
-  <div id="alphaText">{(Math.round(opacity*100)).toString() + '%'}</div>
+  <input type="range" id="alphaValue" min="0" max="1" step="0.01" value={opacity} onChange={(e)=>{
+    const next = Number(e.target.value);
+    setOpacity(next);
+    chrome.storage.local.set({opacity:next});
+  }}></input>
+  <div id="alphaText">{Math.round(opacity * 100)}%</div>
   </div>
 
   <div className="alphaTitle" id="opacity">Opacity</div>
 
     <div className="flexOptions">
-        <input type="button" value="Warm" id="warmButton" className="presetButton" onClick={()=>preset("#FFC107")}></input>
-        <input type="button" value="Cool" id="coolButton" className="presetButton" onClick={()=>preset("#42A5F5")}></input>
-        <input type="button" value="Read" id="readButton" className="presetButton" onClick={()=>preset("#A98256")}></input>
-        <input type="button" value="Mint" id="mintButton" className="presetButton" onClick={()=>preset("#66BB6A")}></input>
+        <input type="button" value="Warm" id="warmButton" className="presetButton" onClick={()=>applyPreset('#FFC107')}></input>
+        <input type="button" value="Cool" id="coolButton" className="presetButton" onClick={()=>applyPreset('#42A5F5')}></input>
+        <input type="button" value="Read" id="readButton" className="presetButton" onClick={()=>applyPreset('#A98256')}></input>
+        <input type="button" value="Mint" id="mintButton" className="presetButton" onClick={()=>applyPreset('#66BB6A')}></input>
     </div>
         
   </div>
@@ -204,7 +191,11 @@ useEffect(()=>{
 
   <div className="on-off">
         <label className="switch">
-  <input type="checkbox" id="on-off-toggle" checked={isEnabled} onChange={(event)=>toggle(event.target.checked)}></input>
+  <input type="checkbox" id="on-off-toggle" checked={isEnabled} onChange={(e)=>{
+    const next = e.target.checked;
+    setIsEnabled(next);
+    chrome.storage.local.set({isEnabled: next});
+  }}></input>
   <span className="slider round" id="on-off-slider">
   <span className="slider-text slider-text-on">On</span>
   <span className="slider-text slider-text-off">Off</span>
@@ -216,16 +207,14 @@ useEffect(()=>{
 
 
   </div>
-</div>
 
 
 
 
 
-</div>
-
-
-
+</>
+  )}
+  </div>
   )
 }
 
